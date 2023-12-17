@@ -1,10 +1,11 @@
 import java.util.stream.Collectors;
 import processing.svg.*;
 
-int N_RACOONS = 4;
+int N_RACOONS_ROW = 1;
+int N_RACOONS_COL = 1;
 
 void setup() {
-  size(720,720);
+  size(720, 720);
   
   GeometryFactory GF = new GeometryFactory();
   
@@ -18,21 +19,27 @@ void setup() {
     println(e);
   }
   
-  // Transforms base racoon to base (and final) shape
+  // Transforms base racoon to base shape
   AffineTransformation baseTransformation = new AffineTransformation();
   Point centroid = baseRacoon.getCentroid();
   baseTransformation.translate(-centroid.getX(),-centroid.getY());
   double diameter = 2*(new MinimumBoundingCircle(baseRacoon)).getRadius();
-  baseTransformation.scale(0.95*width/(diameter*N_RACOONS),0.95*height/(diameter*N_RACOONS));
+  baseTransformation.scale(0.95*width/(diameter*N_RACOONS_ROW),0.95*height/(diameter*N_RACOONS_COL));
   baseTransformation.rotate(PI);
   
   // Progressively add new racoons
-  ArrayList<Polygon> racoons = new ArrayList<Polygon>();
-  for(int i=0; i<N_RACOONS; i++) {
-    for(int j=0; j<N_RACOONS; j++) {
+  ArrayList<Geometry> racoons = new ArrayList<Geometry>();
+  for(int i=0; i<N_RACOONS_ROW; i++) {
+    for(int j=0; j<N_RACOONS_COL; j++) {
+      println("Processing racoon: ", racoons.size()+1, " / ", N_RACOONS_ROW*N_RACOONS_COL);
+      float iTolerance = 0.001 * log(map(i, 0, N_RACOONS_ROW-1, 1, exp(1)));
+      float jTolerance = 0.001 * log(map(j, 0, N_RACOONS_COL-1, 1, exp(1)));
+      Geometry racoon = VWSimplifier.simplify(baseRacoon, iTolerance);
+      racoon = DouglasPeuckerSimplifier.simplify(racoon, jTolerance);
+      
       AffineTransformation t = new AffineTransformation(baseTransformation);
-      t.translate((width/N_RACOONS) * (i+0.5), (height/N_RACOONS) * (j+0.5));
-      Polygon racoon = (Polygon) t.transform(baseRacoon);
+      t.translate((width/N_RACOONS_ROW) * (i+0.5), (height/N_RACOONS_COL) * (j+0.5));
+      racoon = t.transform(racoon);
       racoons.add(racoon);
     }
   }
@@ -42,20 +49,24 @@ void setup() {
   background(255);
   noFill();
   stroke(0);
-  for(Polygon racoon : racoons) {
-    beginShape();
-    for(Coordinate coord : racoon.getExteriorRing().getCoordinates()) {
-      vertex((float) coord.x, (float) coord.y);
-    }
-    endShape();
-    for(int i=0; i<racoon.getNumInteriorRing(); i++) {
+  for(Geometry racoon : racoons) {
+    for(int i=0; i<racoon.getNumGeometries(); i++) {
+      Polygon inner = (Polygon) racoon.getGeometryN(i);
       beginShape();
-      for(Coordinate coord : racoon.getInteriorRingN(i).getCoordinates()){
+      for(Coordinate coord : inner.getExteriorRing().getCoordinates()) {
         vertex((float) coord.x, (float) coord.y);
       }
       endShape();
+      for(int j=0; j<inner.getNumInteriorRing(); j++) {
+        beginShape();
+        for(Coordinate coord : inner.getInteriorRingN(j).getCoordinates()){
+          vertex((float) coord.x, (float) coord.y);
+        }
+        endShape();
+      }
     }
   }
   endRecord();
+  println("Done");
   noLoop();
 }
