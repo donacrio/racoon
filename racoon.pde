@@ -1,24 +1,22 @@
 import java.util.stream.Collectors;
 import processing.svg.*;
 
-int N_RACOONS_ROW = 5;
-int N_RACOONS_COL = 5;
-
-int GRID_INCR = 1;
+int N_RACOONS_ROW = 4;
+int N_RACOONS_COL = 7;
 
 GeometryFactory GF;
 
 void setup() {
-  size(720, 720);
+  //size(9000, 12600);
+  size(618, 1080);
   
   GF = new GeometryFactory();
   
   // Load Racoon geometry
   Geometry baseRacoon = GF.createPolygon();
-  String[] lines = loadStrings("data/racoon.txt");
   WKTReader reader = new WKTReader(GF);
   try {
-    baseRacoon = reader.read(lines[0]);
+    baseRacoon = reader.read(loadStrings("data/racoon.txt")[0]);
   } catch(ParseException e) {
     println(e);
   }
@@ -32,31 +30,20 @@ void setup() {
   baseTransformation.rotate(PI);
   baseRacoon = baseTransformation.transform(baseRacoon);
   
-  
   // Progressively add new racoons
   ArrayList<Geometry> racoons = new ArrayList<Geometry>();
-  ArrayList<LineString> baseRacoonLines = new ArrayList<LineString>();
-  for(int j=0; j<baseRacoon.getNumGeometries(); j++) {
-    Polygon inner = (Polygon) baseRacoon.getGeometryN(j);
-    baseRacoonLines.addAll(getLineStrings(inner));
-  }
   for(int i=0; i<N_RACOONS_ROW; i++) {
-    // Gridify racoon
-    ArrayList<LineString> gridifiedRacoonLines = new ArrayList<LineString>();
-    for(LineString line : baseRacoonLines) {
-      gridifiedRacoonLines.add(gridify(line, GRID_INCR * (2*i+1)));
-    }
-    Geometry gridifiedRacoon = GF.createMultiLineString(gridifiedRacoonLines.toArray(new LineString[0]));
-
-    // Simplify racoon
     for(int j=0; j<N_RACOONS_COL; j++) {
-      // Simplify with geometry simplifier
-      float jTolerance = 10 * log(map(j, 0, N_RACOONS_COL-1, 1, 2.72));
-      println(jTolerance);
-      Geometry racoon = DouglasPeuckerSimplifier.simplify(gridifiedRacoon, jTolerance);
-      
+      // Gridify racoon
+      int gridSize = (1 + i*i* width/400);
+      Geometry racoon = gridify(baseRacoon, gridSize);
+      // Simplify racoon
+      float tolerance = width/300 * j;
+      racoon = simplify(racoon, tolerance);
+      println(i, j, gridSize, tolerance); 
+      // Place racoon to the right position
       AffineTransformation t = new AffineTransformation();
-      t.translate((width/N_RACOONS_ROW) * (i+0.5), (height/N_RACOONS_COL) * (j+0.5));
+      t.translate((width/N_RACOONS_ROW) * ((N_RACOONS_ROW-i-1)+0.5), (height/N_RACOONS_COL) * ((N_RACOONS_COL-j-1)+0.5));
       racoon = t.transform(racoon);
       racoons.add(racoon);
     }
@@ -70,14 +57,12 @@ void setup() {
   stroke(0);    
   for(Geometry racoon : racoons) {
     for(int i=0; i<racoon.getNumGeometries(); i++) {
-      LineString racoonPoly = (LineString) racoon.getGeometryN(i);
-      //for(LineString line : getLineStrings(racoonPoly)) {
-        beginShape();
-        for(Coordinate coord : racoonPoly.getCoordinates()) {
-          vertex((float) coord.x, (float) coord.y);
-        }
-        endShape();
-      //}
+      LineString lines = (LineString) racoon.getGeometryN(i);
+      beginShape();
+      for(Coordinate coord : lines.getCoordinates()) {
+        vertex((float) coord.x, (float) coord.y);
+      }
+      endShape();
     }
   }
   
